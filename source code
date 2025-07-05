@@ -1,0 +1,52 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Servo.h>
+
+#define SS_PIN 10
+#define RST_PIN 9
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+Servo myServo;
+
+byte authorizedUID[4] = {0xDE, 0xAD, 0xBE, 0xEF}; // Replace with your tag UID
+
+void setup() {
+  Serial.begin(9600);
+  SPI.begin();
+  rfid.PCD_Init();
+  myServo.attach(3); // Pin connected to servo
+  myServo.write(0);  // Lock position
+  Serial.println("Place your RFID tag...");
+}
+
+void loop() {
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial())
+    return;
+
+  Serial.print("UID tag: ");
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    Serial.print(rfid.uid.uidByte[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  bool accessGranted = true;
+  for (byte i = 0; i < 4; i++) {
+    if (rfid.uid.uidByte[i] != authorizedUID[i]) {
+      accessGranted = false;
+      break;
+    }
+  }
+
+  if (accessGranted) {
+    Serial.println("Access granted");
+    myServo.write(90); // Unlock position
+    delay(5000);        // Keep door open
+    myServo.write(0);   // Lock again
+  } else {
+    Serial.println("Access denied");
+  }
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+}
